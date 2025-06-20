@@ -40,7 +40,7 @@ func TestImageWithMetadata(t *testing.T) {
 			},
 			expectError: true,
 		},
-		"happy path schema2": {
+		"happy path schema v2": {
 			image: validImageWithManifestV2Data(),
 			expectedImage: imageapi.Image{
 				ObjectMeta: metav1.ObjectMeta{
@@ -120,6 +120,97 @@ func TestImageWithMetadata(t *testing.T) {
 						NetworkDisabled: false,
 						OnBuild:         []string{},
 						Labels:          map[string]string{},
+					},
+				},
+			},
+		},
+		"happy path OCI": {
+			image: validImageWithManifestOCIData(),
+			expectedImage: imageapi.Image{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "id",
+					Annotations: map[string]string{
+						imagev1.DockerImageLayersOrderAnnotation: imagev1.DockerImageLayersOrderAscending,
+					},
+				},
+				DockerImageConfig:            validImageWithManifestOCIData().DockerImageConfig,
+				DockerImageManifest:          validImageWithManifestOCIData().DockerImageManifest,
+				DockerImageManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+				DockerImageLayers: []imageapi.ImageLayer{
+					{
+						Name:      "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a",
+						LayerSize: 29715337,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+				},
+				DockerImageMetadata: imageapi.DockerImage{
+					ID:            "sha256:bf16bdcff9c96b76a6d417bd8f0a3abe0e55c0ed9bdb3549e906834e2592fd5f",
+					Parent:        "",
+					Comment:       "",
+					Created:       metav1.Date(2025, 5, 29, 4, 21, 1, 971275965, time.UTC),
+					Container:     "57d2303e19c80641e487894fdb01e8e26ab42726f45e72624efe9d812e1c8889",
+					DockerVersion: "24.0.7",
+					Author:        "",
+					Architecture:  "amd64",
+					Size:          29718508,
+					ContainerConfig: imageapi.DockerConfig{
+						Hostname:        "57d2303e19c8",
+						Domainname:      "",
+						User:            "",
+						Memory:          0,
+						MemorySwap:      0,
+						CPUShares:       0,
+						CPUSet:          "",
+						AttachStdin:     false,
+						AttachStdout:    false,
+						AttachStderr:    false,
+						PortSpecs:       nil,
+						ExposedPorts:    nil,
+						Tty:             false,
+						OpenStdin:       false,
+						StdinOnce:       false,
+						Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+						Cmd:             []string{"/bin/sh", "-c", "#(nop) ", `CMD ["/bin/bash"]`},
+						Image:           "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+						Volumes:         nil,
+						WorkingDir:      "",
+						Entrypoint:      nil,
+						NetworkDisabled: false,
+						SecurityOpts:    nil,
+						OnBuild:         nil,
+						Labels: map[string]string{
+							"org.opencontainers.image.ref.name": "ubuntu",
+							"org.opencontainers.image.version":  "24.04",
+						},
+					},
+					Config: &imageapi.DockerConfig{
+						Hostname:        "",
+						Domainname:      "",
+						User:            "",
+						Memory:          0,
+						MemorySwap:      0,
+						CPUShares:       0,
+						CPUSet:          "",
+						AttachStdin:     false,
+						AttachStdout:    false,
+						AttachStderr:    false,
+						PortSpecs:       nil,
+						ExposedPorts:    nil,
+						Tty:             false,
+						OpenStdin:       false,
+						StdinOnce:       false,
+						Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+						Cmd:             []string{"/bin/bash"},
+						Image:           "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+						Volumes:         nil,
+						WorkingDir:      "",
+						Entrypoint:      nil,
+						NetworkDisabled: false,
+						OnBuild:         nil,
+						Labels: map[string]string{
+							"org.opencontainers.image.ref.name": "ubuntu",
+							"org.opencontainers.image.version":  "24.04",
+						},
 					},
 				},
 			},
@@ -292,6 +383,129 @@ func validImageWithManifestV2Data() imageapi.Image {
             "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
             "size": 639152,
             "digest": "sha256:b4ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
+        }
+    ]
+}`,
+	}
+}
+
+func validImageWithManifestOCIData() imageapi.Image {
+	return imageapi.Image{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "id",
+		},
+		DockerImageConfig: `{
+    "architecture": "amd64",
+    "config": {
+        "Hostname": "",
+        "Domainname": "",
+        "User": "",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        ],
+        "Cmd": [
+            "/bin/bash"
+        ],
+        "Image": "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+        "Volumes": null,
+        "WorkingDir": "",
+        "Entrypoint": null,
+        "OnBuild": null,
+        "Labels": {
+            "org.opencontainers.image.ref.name": "ubuntu",
+            "org.opencontainers.image.version": "24.04"
+        }
+    },
+    "container": "57d2303e19c80641e487894fdb01e8e26ab42726f45e72624efe9d812e1c8889",
+    "container_config": {
+        "Hostname": "57d2303e19c8",
+        "Domainname": "",
+        "User": "",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        ],
+        "Cmd": [
+            "/bin/sh",
+            "-c",
+            "#(nop) ",
+            "CMD [\"/bin/bash\"]"
+        ],
+        "Image": "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+        "Volumes": null,
+        "WorkingDir": "",
+        "Entrypoint": null,
+        "OnBuild": null,
+        "Labels": {
+            "org.opencontainers.image.ref.name": "ubuntu",
+            "org.opencontainers.image.version": "24.04"
+        }
+    },
+    "created": "2025-05-29T04:21:01.971275965Z",
+    "docker_version": "24.0.7",
+    "history": [
+        {
+            "created": "2025-05-29T04:20:59.390476489Z",
+            "created_by": "/bin/sh -c #(nop)  ARG RELEASE",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:20:59.425928067Z",
+            "created_by": "/bin/sh -c #(nop)  ARG LAUNCHPAD_BUILD_ARCH",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:20:59.461048974Z",
+            "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.ref.name=ubuntu",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:20:59.498669132Z",
+            "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.version=24.04",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:21:01.6549815Z",
+            "created_by": "/bin/sh -c #(nop) ADD file:598ca0108009b5c2e9e6f4fc4bd19a6bcd604fccb5b9376fac14a75522a5cfa3 in / "
+        },
+        {
+            "created": "2025-05-29T04:21:01.971275965Z",
+            "created_by": "/bin/sh -c #(nop)  CMD [\"/bin/bash\"]",
+            "empty_layer": true
+        }
+    ],
+    "os": "linux",
+    "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+            "sha256:a8346d259389bc6221b4f3c61bad4e48087c5b82308e8f53ce703cfc8333c7b3"
+        ]
+    }
+}`,
+		DockerImageManifest: `{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "config": {
+        "mediaType": "application/vnd.oci.image.config.v1+json",
+        "size": 2295,
+        "digest": "sha256:bf16bdcff9c96b76a6d417bd8f0a3abe0e55c0ed9bdb3549e906834e2592fd5f"
+    },
+    "layers": [
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "size": 29715337,
+            "digest": "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a"
         }
     ]
 }`,
