@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,16 +39,6 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 func TestStorage(t *testing.T) {
 	storage, _ := newStorage(t)
 	image.NewRegistry(storage)
-}
-
-func validImage() *imageapi.Image {
-	return &imageapi.Image{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:         "foo",
-			GenerateName: "foo",
-		},
-		DockerImageReference: "openshift/origin",
-	}
 }
 
 func TestCreate(t *testing.T) {
@@ -146,6 +137,434 @@ func TestWatch(t *testing.T) {
 	)
 }
 
+func TestCreateSetsMetadata(t *testing.T) {
+	testCases := []struct {
+		image  *imageapi.Image
+		expect func(*imageapi.Image) bool
+	}{
+		{
+			image: &imageapi.Image{
+				ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
+				DockerImageReference: "openshift/ruby-19-centos",
+			},
+		},
+		{
+			expect: func(image *imageapi.Image) bool {
+				if image.DockerImageMetadata.Size != 28643712 {
+					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
+					return false
+				}
+				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
+					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
+					return false
+				}
+				return true
+			},
+			image: &imageapi.Image{
+				ObjectMeta:                   metav1.ObjectMeta{Name: "foo"},
+				DockerImageReference:         "openshift/ruby-19-centos",
+				DockerImageManifestMediaType: "application/vnd.docker.container.image.v1+json",
+				DockerImageManifest:          etcdManifest,
+				DockerImageConfig:            etcdConfig,
+			},
+		},
+	}
+
+	for i, test := range testCases {
+		storage, server := newStorage(t)
+		defer server.Terminate(t)
+		defer storage.Store.DestroyFunc()
+
+		obj, err := storage.Create(apirequest.NewDefaultContext(), test.image, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		if obj == nil {
+			t.Errorf("%d: Expected nil obj, got %v", i, obj)
+			continue
+		}
+		if err != nil {
+			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
+			continue
+		}
+		image, ok := obj.(*imageapi.Image)
+		if !ok {
+			t.Errorf("%d: Expected image type, got: %#v", i, obj)
+			continue
+		}
+		if test.expect != nil && !test.expect(image) {
+			t.Errorf("%d: Unexpected image: %#v", i, obj)
+		}
+	}
+}
+
+func TestUpdateResetsMetadata(t *testing.T) {
+	testCases := []struct {
+		image    *imageapi.Image
+		existing *imageapi.Image
+		expect   func(*imageapi.Image) bool
+	}{
+		// manifest changes are ignored
+		{
+			expect: func(image *imageapi.Image) bool {
+				if image.Labels["a"] != "b" {
+					t.Errorf("unexpected labels: %s", image.Labels)
+					return false
+				}
+				if image.DockerImageManifest != "" {
+					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
+					return false
+				}
+				if image.DockerImageMetadata.ID != "foo" {
+					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
+					return false
+				}
+				if image.DockerImageReference == "openshift/ruby-19-centos-2" {
+					t.Errorf("image reference not changed: %s", image.DockerImageReference)
+					return false
+				}
+				if image.DockerImageMetadata.Size != 0 {
+					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
+					return false
+				}
+				if len(image.DockerImageLayers) != 1 && image.DockerImageLayers[0].LayerSize != 10 {
+					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
+					return false
+				}
+				return true
+			},
+			existing: &imageapi.Image{
+				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				DockerImageReference: "openshift/ruby-19-centos-2",
+				DockerImageLayers:    []imageapi.ImageLayer{{Name: "test", LayerSize: 10}},
+				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
+			},
+			image: &imageapi.Image{
+				ObjectMeta:                   metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Labels: map[string]string{"a": "b"}},
+				DockerImageReference:         "openshift/ruby-19-centos",
+				DockerImageManifestMediaType: "application/vnd.docker.container.image.v1+json",
+				DockerImageManifest:          etcdManifest,
+				DockerImageConfig:            etcdConfig,
+			},
+		},
+		// existing manifest is preserved, and unpacked
+		{
+			expect: func(image *imageapi.Image) bool {
+				if len(image.DockerImageManifest) != 0 {
+					t.Errorf("unexpected not empty manifest")
+					return false
+				}
+				if image.DockerImageMetadata.ID != "fe50ac14986497fa6b5d2cc24feb4a561d01767bc64413752c0988cb70b0b8b9" {
+					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
+					return false
+				}
+				if image.DockerImageReference != "openshift/ruby-19-centos" {
+					t.Errorf("image reference not changed: %s", image.DockerImageReference)
+					return false
+				}
+				if image.DockerImageMetadata.Size != 28643712 {
+					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
+					return false
+				}
+				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
+					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
+					return false
+				}
+				return true
+			},
+			existing: &imageapi.Image{
+				ObjectMeta:                   metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				DockerImageReference:         "openshift/ruby-19-centos-2",
+				DockerImageLayers:            []imageapi.ImageLayer{},
+				DockerImageManifestMediaType: "application/vnd.docker.container.image.v1+json",
+				DockerImageManifest:          etcdManifest,
+				DockerImageConfig:            etcdConfig,
+			},
+			image: &imageapi.Image{
+				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+				DockerImageReference: "openshift/ruby-19-centos",
+				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
+			},
+		},
+		// old manifest is replaced because the new manifest matches the digest
+		{
+			expect: func(image *imageapi.Image) bool {
+				if image.DockerImageManifest != etcdManifest {
+					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
+					return false
+				}
+				if image.DockerImageMetadata.ID != "fe50ac14986497fa6b5d2cc24feb4a561d01767bc64413752c0988cb70b0b8b9" {
+					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
+					return false
+				}
+				if image.DockerImageReference != "openshift/ruby-19-centos" {
+					t.Errorf("image reference not changed: %s", image.DockerImageReference)
+					return false
+				}
+				if image.DockerImageMetadata.Size != 28643712 {
+					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
+					return false
+				}
+				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
+					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
+					return false
+				}
+				return true
+			},
+			existing: &imageapi.Image{
+				ObjectMeta:                   metav1.ObjectMeta{Name: "sha256:958608f8ecc1dc62c93b6c610f3a834dae4220c9642e6e8b4e0f2b3ad7cbd238", ResourceVersion: "1"},
+				DockerImageReference:         "openshift/ruby-19-centos-2",
+				DockerImageLayers:            []imageapi.ImageLayer{},
+				DockerImageManifestMediaType: "application/vnd.docker.container.image.v1+json",
+				DockerImageManifest:          etcdManifest,
+				DockerImageConfig:            etcdConfig,
+			},
+			image: &imageapi.Image{
+				ObjectMeta:                   metav1.ObjectMeta{Name: "sha256:958608f8ecc1dc62c93b6c610f3a834dae4220c9642e6e8b4e0f2b3ad7cbd238", ResourceVersion: "1"},
+				DockerImageReference:         "openshift/ruby-19-centos",
+				DockerImageMetadata:          imageapi.DockerImage{ID: "foo"},
+				DockerImageManifestMediaType: "application/vnd.docker.container.image.v1+json",
+				DockerImageManifest:          etcdManifest,
+				DockerImageConfig:            etcdConfig,
+			},
+		}}
+
+	for i, test := range testCases {
+		storage, server := newStorage(t)
+		defer server.Terminate(t)
+		defer storage.Store.DestroyFunc()
+
+		// Clear the resource version before creating
+		test.existing.ResourceVersion = ""
+		created, err := storage.Create(apirequest.NewDefaultContext(), test.existing, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
+			continue
+		}
+
+		// Copy the resource version into our update object
+		test.image.ResourceVersion = created.(*imageapi.Image).ResourceVersion
+		obj, _, err := storage.Update(apirequest.NewDefaultContext(), test.image.Name, rest.DefaultUpdatedObjectInfo(test.image), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+		if err != nil {
+			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
+			continue
+		}
+		if obj == nil {
+			t.Errorf("%d: Expected nil obj, got %v", i, obj)
+			continue
+		}
+		image, ok := obj.(*imageapi.Image)
+		if !ok {
+			t.Errorf("%d: Expected image type, got: %#v", i, obj)
+			continue
+		}
+		if test.expect != nil && !test.expect(image) {
+			t.Errorf("%d: Unexpected image: %#v", i, obj)
+		}
+	}
+}
+
+func validImage() *imageapi.Image {
+	return &imageapi.Image{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:         "foo",
+			GenerateName: "foo",
+		},
+		DockerImageReference:         "openshift/origin",
+		DockerImageManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+		DockerImageManifest: `{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "config": {
+        "mediaType": "application/vnd.oci.image.config.v1+json",
+        "size": 2295,
+        "digest": "sha256:bf16bdcff9c96b76a6d417bd8f0a3abe0e55c0ed9bdb3549e906834e2592fd5f"
+    },
+    "layers": [
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "size": 29715337,
+            "digest": "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a"
+        }
+    ]
+}`,
+		DockerImageConfig: `{
+    "architecture": "amd64",
+    "config": {
+        "Hostname": "",
+        "Domainname": "",
+        "User": "",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        ],
+        "Cmd": [
+            "/bin/bash"
+        ],
+        "Image": "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+        "Volumes": null,
+        "WorkingDir": "",
+        "Entrypoint": null,
+        "OnBuild": null,
+        "Labels": {
+            "org.opencontainers.image.ref.name": "ubuntu",
+            "org.opencontainers.image.version": "24.04"
+        }
+    },
+    "container": "57d2303e19c80641e487894fdb01e8e26ab42726f45e72624efe9d812e1c8889",
+    "container_config": {
+        "Hostname": "57d2303e19c8",
+        "Domainname": "",
+        "User": "",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        ],
+        "Cmd": [
+            "/bin/sh",
+            "-c",
+            "#(nop) ",
+            "CMD [\"/bin/bash\"]"
+        ],
+        "Image": "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+        "Volumes": null,
+        "WorkingDir": "",
+        "Entrypoint": null,
+        "OnBuild": null,
+        "Labels": {
+            "org.opencontainers.image.ref.name": "ubuntu",
+            "org.opencontainers.image.version": "24.04"
+        }
+    },
+    "created": "2025-05-29T04:21:01.971275965Z",
+    "docker_version": "24.0.7",
+    "history": [
+        {
+            "created": "2025-05-29T04:20:59.390476489Z",
+            "created_by": "/bin/sh -c #(nop)  ARG RELEASE",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:20:59.425928067Z",
+            "created_by": "/bin/sh -c #(nop)  ARG LAUNCHPAD_BUILD_ARCH",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:20:59.461048974Z",
+            "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.ref.name=ubuntu",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:20:59.498669132Z",
+            "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.version=24.04",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-05-29T04:21:01.6549815Z",
+            "created_by": "/bin/sh -c #(nop) ADD file:598ca0108009b5c2e9e6f4fc4bd19a6bcd604fccb5b9376fac14a75522a5cfa3 in / "
+        },
+        {
+            "created": "2025-05-29T04:21:01.971275965Z",
+            "created_by": "/bin/sh -c #(nop)  CMD [\"/bin/bash\"]",
+            "empty_layer": true
+        }
+    ],
+    "os": "linux",
+    "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+            "sha256:a8346d259389bc6221b4f3c61bad4e48087c5b82308e8f53ce703cfc8333c7b3"
+        ]
+    }
+}`,
+
+		DockerImageLayers: []imageapi.ImageLayer{
+			{
+				Name:      "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a",
+				LayerSize: 29715337,
+				MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+			},
+		},
+		DockerImageMetadata: imageapi.DockerImage{
+			ID:            "sha256:bf16bdcff9c96b76a6d417bd8f0a3abe0e55c0ed9bdb3549e906834e2592fd5f",
+			Parent:        "",
+			Comment:       "",
+			Created:       metav1.Date(2025, 5, 29, 4, 21, 1, 971275965, time.UTC),
+			Container:     "57d2303e19c80641e487894fdb01e8e26ab42726f45e72624efe9d812e1c8889",
+			DockerVersion: "24.0.7",
+			Author:        "",
+			Architecture:  "amd64",
+			Size:          29718508,
+			ContainerConfig: imageapi.DockerConfig{
+				Hostname:        "57d2303e19c8",
+				Domainname:      "",
+				User:            "",
+				Memory:          0,
+				MemorySwap:      0,
+				CPUShares:       0,
+				CPUSet:          "",
+				AttachStdin:     false,
+				AttachStdout:    false,
+				AttachStderr:    false,
+				PortSpecs:       nil,
+				ExposedPorts:    nil,
+				Tty:             false,
+				OpenStdin:       false,
+				StdinOnce:       false,
+				Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+				Cmd:             []string{"/bin/sh", "-c", "#(nop) ", `CMD ["/bin/bash"]`},
+				Image:           "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+				Volumes:         nil,
+				WorkingDir:      "",
+				Entrypoint:      nil,
+				NetworkDisabled: false,
+				SecurityOpts:    nil,
+				OnBuild:         nil,
+				Labels: map[string]string{
+					"org.opencontainers.image.ref.name": "ubuntu",
+					"org.opencontainers.image.version":  "24.04",
+				},
+			},
+			Config: &imageapi.DockerConfig{
+				Hostname:        "",
+				Domainname:      "",
+				User:            "",
+				Memory:          0,
+				MemorySwap:      0,
+				CPUShares:       0,
+				CPUSet:          "",
+				AttachStdin:     false,
+				AttachStdout:    false,
+				AttachStderr:    false,
+				PortSpecs:       nil,
+				ExposedPorts:    nil,
+				Tty:             false,
+				OpenStdin:       false,
+				StdinOnce:       false,
+				Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
+				Cmd:             []string{"/bin/bash"},
+				Image:           "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
+				Volumes:         nil,
+				WorkingDir:      "",
+				Entrypoint:      nil,
+				NetworkDisabled: false,
+				OnBuild:         nil,
+				Labels: map[string]string{
+					"org.opencontainers.image.ref.name": "ubuntu",
+					"org.opencontainers.image.version":  "24.04",
+				},
+			},
+		},
+	}
+}
+
 const etcdManifest = `{
     "schemaVersion": 2,
     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -225,224 +644,4 @@ const etcdConfig = `{
             "-c"
         ]
     }
-}
-`
-
-func TestCreateSetsMetadata(t *testing.T) {
-	testCases := []struct {
-		image  *imageapi.Image
-		expect func(*imageapi.Image) bool
-	}{
-		{
-			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
-				DockerImageReference: "openshift/ruby-19-centos",
-			},
-		},
-		{
-			expect: func(image *imageapi.Image) bool {
-				if image.DockerImageMetadata.Size != 28643712 {
-					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
-				}
-				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
-					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
-				}
-				return true
-			},
-			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
-				DockerImageReference: "openshift/ruby-19-centos",
-				DockerImageManifest:  etcdManifest,
-				DockerImageConfig:    etcdConfig,
-			},
-		},
-	}
-
-	for i, test := range testCases {
-		storage, server := newStorage(t)
-		defer server.Terminate(t)
-		defer storage.Store.DestroyFunc()
-
-		obj, err := storage.Create(apirequest.NewDefaultContext(), test.image, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-		if obj == nil {
-			t.Errorf("%d: Expected nil obj, got %v", i, obj)
-			continue
-		}
-		if err != nil {
-			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
-			continue
-		}
-		image, ok := obj.(*imageapi.Image)
-		if !ok {
-			t.Errorf("%d: Expected image type, got: %#v", i, obj)
-			continue
-		}
-		if test.expect != nil && !test.expect(image) {
-			t.Errorf("%d: Unexpected image: %#v", i, obj)
-		}
-	}
-}
-
-func TestUpdateResetsMetadata(t *testing.T) {
-	testCases := []struct {
-		image    *imageapi.Image
-		existing *imageapi.Image
-		expect   func(*imageapi.Image) bool
-	}{
-		// manifest changes are ignored
-		{
-			expect: func(image *imageapi.Image) bool {
-				if image.Labels["a"] != "b" {
-					t.Errorf("unexpected labels: %s", image.Labels)
-					return false
-				}
-				if image.DockerImageManifest != "" {
-					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
-					return false
-				}
-				if image.DockerImageMetadata.ID != "foo" {
-					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
-					return false
-				}
-				if image.DockerImageReference == "openshift/ruby-19-centos-2" {
-					t.Errorf("image reference not changed: %s", image.DockerImageReference)
-					return false
-				}
-				if image.DockerImageMetadata.Size != 0 {
-					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
-				}
-				if len(image.DockerImageLayers) != 1 && image.DockerImageLayers[0].LayerSize != 10 {
-					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
-				}
-				return true
-			},
-			existing: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos-2",
-				DockerImageLayers:    []imageapi.ImageLayer{{Name: "test", LayerSize: 10}},
-				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
-			},
-			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Labels: map[string]string{"a": "b"}},
-				DockerImageReference: "openshift/ruby-19-centos",
-				DockerImageManifest:  etcdManifest,
-				DockerImageConfig:    etcdConfig,
-			},
-		},
-		// existing manifest is preserved, and unpacked
-		{
-			expect: func(image *imageapi.Image) bool {
-				if len(image.DockerImageManifest) != 0 {
-					t.Errorf("unexpected not empty manifest")
-					return false
-				}
-				if image.DockerImageMetadata.ID != "fe50ac14986497fa6b5d2cc24feb4a561d01767bc64413752c0988cb70b0b8b9" {
-					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
-					return false
-				}
-				if image.DockerImageReference != "openshift/ruby-19-centos" {
-					t.Errorf("image reference not changed: %s", image.DockerImageReference)
-					return false
-				}
-				if image.DockerImageMetadata.Size != 28643712 {
-					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
-				}
-				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
-					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
-				}
-				return true
-			},
-			existing: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos-2",
-				DockerImageLayers:    []imageapi.ImageLayer{},
-				DockerImageManifest:  etcdManifest,
-				DockerImageConfig:    etcdConfig,
-			},
-			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos",
-				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
-			},
-		},
-		// old manifest is replaced because the new manifest matches the digest
-		{
-			expect: func(image *imageapi.Image) bool {
-				if image.DockerImageManifest != etcdManifest {
-					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
-					return false
-				}
-				if image.DockerImageMetadata.ID != "fe50ac14986497fa6b5d2cc24feb4a561d01767bc64413752c0988cb70b0b8b9" {
-					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
-					return false
-				}
-				if image.DockerImageReference != "openshift/ruby-19-centos" {
-					t.Errorf("image reference not changed: %s", image.DockerImageReference)
-					return false
-				}
-				if image.DockerImageMetadata.Size != 28643712 {
-					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
-				}
-				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
-					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
-				}
-				return true
-			},
-			existing: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "sha256:958608f8ecc1dc62c93b6c610f3a834dae4220c9642e6e8b4e0f2b3ad7cbd238", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos-2",
-				DockerImageLayers:    []imageapi.ImageLayer{},
-				DockerImageManifest:  etcdManifest,
-				DockerImageConfig:    etcdConfig,
-			},
-			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "sha256:958608f8ecc1dc62c93b6c610f3a834dae4220c9642e6e8b4e0f2b3ad7cbd238", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos",
-				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
-				DockerImageManifest:  etcdManifest,
-				DockerImageConfig:    etcdConfig,
-			},
-		}}
-
-	for i, test := range testCases {
-		storage, server := newStorage(t)
-		defer server.Terminate(t)
-		defer storage.Store.DestroyFunc()
-
-		// Clear the resource version before creating
-		test.existing.ResourceVersion = ""
-		created, err := storage.Create(apirequest.NewDefaultContext(), test.existing, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-		if err != nil {
-			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
-			continue
-		}
-
-		// Copy the resource version into our update object
-		test.image.ResourceVersion = created.(*imageapi.Image).ResourceVersion
-		obj, _, err := storage.Update(apirequest.NewDefaultContext(), test.image.Name, rest.DefaultUpdatedObjectInfo(test.image), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-		if err != nil {
-			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
-			continue
-		}
-		if obj == nil {
-			t.Errorf("%d: Expected nil obj, got %v", i, obj)
-			continue
-		}
-		image, ok := obj.(*imageapi.Image)
-		if !ok {
-			t.Errorf("%d: Expected image type, got: %#v", i, obj)
-			continue
-		}
-		if test.expect != nil && !test.expect(image) {
-			t.Errorf("%d: Unexpected image: %#v", i, obj)
-		}
-	}
-}
+}`
