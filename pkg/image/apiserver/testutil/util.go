@@ -13,62 +13,130 @@ func MakeDockerImageReference(ns, isName, imageID string) string {
 	return fmt.Sprintf("%s/%s/%s@%s", InternalRegistryURL, ns, isName, imageID)
 }
 
-// 1 data layer of 128 B
-const BaseImageWith1LayerDigest = `sha256:c5207ce0f38da269ad2e58f143b5ea4b314c75ce1121384369f0db9015e10e82`
+// BaseImageWith1LayerDigest is the digest associated with BaseImageWith1Layer.
+//
+// This is actually docksal/empty.
+const BaseImageWith1LayerDigest = `sha256:f853843b26903da94dd1cdf9e39ff7e2ba7a754388341895d557dbe913f5a915`
 
+// BaseImageWith1Layer contains a single layer.
 const BaseImageWith1Layer = `{
-   "schemaVersion": 1,
-   "name": "miminar/baseImageWith1Layer",
-   "tag": "latest",
-   "architecture": "amd64",
-   "fsLayers": [
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+   "config": {
+      "mediaType": "application/vnd.docker.container.image.v1+json",
+      "size": 1512,
+      "digest": "sha256:6c6084ed97e5851b5d216b20ed1852301278584c3c6aff915272b231593f6f98"
+   },
+   "layers": [
       {
-         "blobSum": "sha256:2d099e04ef6c850542d8ab916df2e9417cc799d39b78f64440e51402f1261a36"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      }
-   ],
-   "history": [
-      {
-		  "v1Compatibility": "{\"architecture\":\"amd64\",\"author\":\"miminar@redhat.com\",\"config\":{\"Hostname\":\"d7b63ae1152b\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":null,\"Image\":\"sha256:d4994ff5bda31913c54af389d68d27418b294cde415cb41282b513900bd11f1e\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"container\":\"99664df33257d325a5d3c082e72a5b6bf86adf1d4e75af6c5a5c4cdaab1fac58\",\"container_config\":{\"Hostname\":\"d7b63ae1152b\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) COPY file:90583fd8c765e40f7f2070c55da446e138b019b0712dee898d8193b66b05d48d in /data1\"],\"Image\":\"sha256:d4994ff5bda31913c54af389d68d27418b294cde415cb41282b513900bd11f1e\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"created\":\"2016-02-15T07:30:37.655693399Z\",\"docker_version\":\"1.10.0\",\"id\":\"3303329125f4954da646b116f6e4a7e40d03656d4802340d46aca8a473d9c3e4\",\"os\":\"linux\",\"parent\":\"3690474eb5b4b26fdfbd89c6e159e8cc376ca76ef48032a30fa6aafd56337880\",\"size\":128}"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"3690474eb5b4b26fdfbd89c6e159e8cc376ca76ef48032a30fa6aafd56337880\",\"created\":\"2016-02-15T07:30:37.531741167Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) MAINTAINER miminar@redhat.com\"]},\"throwaway\":true}"
+         "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+         "size": 1970140,
+         "digest": "sha256:550fe1bea624a5c62551cf09f3aa10886eed133794844af1dfb775118309387e"
       }
    ]
 }`
 
-// 2 data layers, the first is shared with baseImageWith1Layer, total size of 240 B
-const BaseImageWith2LayersDigest = "sha256:77371f61c054608a4bb1a96b99f9be69f0868340f5c924ecd8813172f7cf853d"
+// BaseImageWith1LayerConfig is the config associated with BaseImageWith1Layer.
+const BaseImageWith1LayerConfig = `{
+  "architecture": "amd64",
+  "config": {
+    "Hostname": "",
+    "Domainname": "",
+    "User": "",
+    "AttachStdin": false,
+    "AttachStdout": false,
+    "AttachStderr": false,
+    "Tty": false,
+    "OpenStdin": false,
+    "StdinOnce": false,
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Cmd": [
+      "/bin/sh"
+    ],
+    "ArgsEscaped": true,
+    "Image": "sha256:01b85c6717c3b1f5379864199c541cecabb81be758b4fec6ef0b66cbfb6e11a5",
+    "Volumes": null,
+    "WorkingDir": "",
+    "Entrypoint": null,
+    "OnBuild": null,
+    "Labels": null
+  },
+  "container": "f8a4df32c288f30c6d641c3945c88b64490e1e029be516209955023786cf1727",
+  "container_config": {
+    "Hostname": "f8a4df32c288",
+    "Domainname": "",
+    "User": "",
+    "AttachStdin": false,
+    "AttachStdout": false,
+    "AttachStderr": false,
+    "Tty": false,
+    "OpenStdin": false,
+    "StdinOnce": false,
+    "Env": [
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Cmd": [
+      "/bin/sh",
+      "-c",
+      "#(nop) ",
+      "CMD [\"/bin/sh\"]"
+    ],
+    "ArgsEscaped": true,
+    "Image": "sha256:01b85c6717c3b1f5379864199c541cecabb81be758b4fec6ef0b66cbfb6e11a5",
+    "Volumes": null,
+    "WorkingDir": "",
+    "Entrypoint": null,
+    "OnBuild": null,
+    "Labels": {}
+  },
+  "created": "2018-01-09T21:13:01.402230769Z",
+  "docker_version": "17.06.2-ce",
+  "history": [
+    {
+      "created": "2018-01-09T21:13:01.165340448Z",
+      "created_by": "/bin/sh -c #(nop) ADD file:df48d6d6df42a01380557aebd4ca02807fc08a76a1d1b36d957e59a41c69db0b in / "
+    },
+    {
+      "created": "2018-01-09T21:13:01.402230769Z",
+      "created_by": "/bin/sh -c #(nop)  CMD [\"/bin/sh\"]",
+      "empty_layer": true
+    }
+  ],
+  "os": "linux",
+  "rootfs": {
+    "type": "layers",
+    "diff_ids": [
+      "sha256:d39d92664027be502c35cf1bf464c726d15b8ead0e3084be6e252a161730bc82"
+    ]
+  }
+}`
 
+// BaseImageWith2LayersDigest is the digest associated with BaseImageWith2Layers.
+const BaseImageWith2LayersDigest = "sha256:6c64418d228763c6f01f81c209efa169f9930a691724d8b10faf025fc6ece53f"
+
+// BaseImageWith2Layers contains 2 layers while the first one is shared with BaseImageWith1Layer.
 const BaseImageWith2Layers = `{
-   "schemaVersion": 1,
-   "name": "miminar/baseImageWith2Layers",
-   "tag": "latest",
-   "architecture": "amd64",
-   "fsLayers": [
-      {
-         "blobSum": "sha256:e7900a2e6943680b384950859a0616089757cae4d8c6e98db9cfec6c41fe2834"
-      },
-      {
-         "blobSum": "sha256:2d099e04ef6c850542d8ab916df2e9417cc799d39b78f64440e51402f1261a36"
-      },
-      {
-         "blobSum": "sha256:a3ed95caeb02ffe68cdd9fd84406680ae93d633cb16422d00e8a7c22955b46d4"
-      }
-   ],
-   "history": [
-      {
-          "v1Compatibility": "{\"architecture\":\"amd64\",\"author\":\"miminar@redhat.com\",\"config\":{\"Hostname\":\"686b99d75c4a\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":null,\"Image\":\"sha256:356b1cbd1af67cfa316c7066895954a69865b972abe680942c123e8bfbbd7458\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"container\":\"686b99d75c4a744420c9a6bf9d3ba2548e72462e4719c8202878315f48083b2c\",\"container_config\":{\"Hostname\":\"686b99d75c4a\",\"Domainname\":\"\",\"User\":\"\",\"AttachStdin\":false,\"AttachStdout\":false,\"AttachStderr\":false,\"Tty\":false,\"OpenStdin\":false,\"StdinOnce\":false,\"Env\":[\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],\"Cmd\":[\"/bin/sh\",\"-c\",\"#(nop) COPY file:23d2e6ff1c67ff4caee900c71d58df6e37bfb9defe46085018c4ba29c3d2de5a in /data2\"],\"Image\":\"sha256:356b1cbd1af67cfa316c7066895954a69865b972abe680942c123e8bfbbd7458\",\"Volumes\":null,\"WorkingDir\":\"\",\"Entrypoint\":null,\"OnBuild\":null,\"Labels\":{}},\"created\":\"2016-02-15T07:31:50.390272025Z\",\"docker_version\":\"1.10.0\",\"id\":\"61c8a7f2be3a9b6fcd46f24da46eedfd37200b0d067d487595942b5b8bacbce7\",\"os\":\"linux\",\"parent\":\"1620fdccc2424391c3422467cec611bc32767d5bfae5bd8a2fb53c795e2a3e86\",\"size\":112}"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"1620fdccc2424391c3422467cec611bc32767d5bfae5bd8a2fb53c795e2a3e86\",\"parent\":\"3690474eb5b4b26fdfbd89c6e159e8cc376ca76ef48032a30fa6aafd56337880\",\"created\":\"2016-02-15T07:30:37.655693399Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) COPY file:90583fd8c765e40f7f2070c55da446e138b019b0712dee898d8193b66b05d48d in /data1\"]},\"size\":128}"
-      },
-      {
-         "v1Compatibility": "{\"id\":\"3690474eb5b4b26fdfbd89c6e159e8cc376ca76ef48032a30fa6aafd56337880\",\"created\":\"2016-02-15T07:30:37.531741167Z\",\"container_config\":{\"Cmd\":[\"/bin/sh -c #(nop) MAINTAINER miminar@redhat.com\"]},\"throwaway\":true}"
-      }
-   ]
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.oci.image.manifest.v1+json",
+  "config": {
+    "mediaType": "application/vnd.oci.image.config.v1+json",
+    "digest": "sha256:245780beb82f97496ad0dee2d70c6fd2bfa56adedb229a3e25c9e801dd262b5e",
+    "size": 2803
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:155ad54a8b2812a0ec559ff82c0c6f0f0dddb337a226b11879f09e15f67b69fc",
+      "size": 48476100
+    },
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:8031108f3cda87bb32f090262d0109c8a0db99168050967becefad502e9a681b",
+      "size": 24058530
+    }
+  ]
 }`
 
 // based on baseImageWith1Layer, it adds a new data layer of 126 B
