@@ -7,9 +7,9 @@ import (
 )
 
 // kindest/node:v1.33.1
-const ImageSchemaV2ManifestDigest = `sha256:14ffd6ee8a3daa20cc934ba786626b181e1797268c5465f2c299a7cf54494c77`
+const KindestManifestDigest = `sha256:14ffd6ee8a3daa20cc934ba786626b181e1797268c5465f2c299a7cf54494c77`
 
-const kindestManifest = `{
+const KindestManifest = `{
     "schemaVersion": 2,
     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
     "config": {
@@ -31,10 +31,9 @@ const kindestManifest = `{
     ]
 }`
 
-// This is the same as the config digest.
-const kindestImageDigest = `sha256:d6b20550c77b11385dd30115ba29dbf9a9bfc98c2f28ff7d162a6ad7c9686251`
+const KindestConfigDigest = `sha256:d6b20550c77b11385dd30115ba29dbf9a9bfc98c2f28ff7d162a6ad7c9686251`
 
-const kindestConfig = `{
+const KindestConfig = `{
     "architecture": "amd64",
     "config": {
         "Hostname": "5e7483a6cf0e",
@@ -134,16 +133,16 @@ const kindestConfig = `{
     }
 }`
 
-func MustImageSchemaV2(hooks ...func(*imageapi.Image)) *imageapi.Image {
+func MustKindestImage(hooks ...func(*imageapi.Image)) *imageapi.Image {
 	img := &imageapi.Image{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:         kindestImageDigest,
+			Name:         KindestConfigDigest,
 			GenerateName: "kindest",
 		},
 		DockerImageReference:         "kindest/node:v1.33.1",
 		DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
-		DockerImageManifest:          kindestManifest,
-		DockerImageConfig:            kindestConfig,
+		DockerImageManifest:          KindestManifest,
+		DockerImageConfig:            KindestConfig,
 	}
 	for _, hook := range hooks {
 		hook(img)
