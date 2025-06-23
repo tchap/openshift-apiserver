@@ -18,7 +18,7 @@ import (
 	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 
 	imageapi "github.com/openshift/openshift-apiserver/pkg/image/apis/image"
-	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/testutil"
+	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/internal/testutil"
 )
 
 func fuzzImage(t *testing.T, image *imageapi.Image, seed int64) *imageapi.Image {
@@ -26,7 +26,7 @@ func fuzzImage(t *testing.T, image *imageapi.Image, seed int64) *imageapi.Image 
 	f.Funcs(
 		func(j *imageapi.Image, c fuzz.Continue) {
 			c.FuzzNoCustom(j)
-			j.Annotations = make(map[string]string)
+			j.Annotations = make(map[string]string)q
 			j.Labels = make(map[string]string)
 			j.Signatures = make([]imageapi.ImageSignature, c.Rand.Intn(3)+2)
 			for i := range j.Signatures {
