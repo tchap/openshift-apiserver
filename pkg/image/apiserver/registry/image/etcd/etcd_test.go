@@ -320,6 +320,8 @@ const ubuntuManifest = `{
     ]
 }`
 
+const ubuntuConfigDigest = `sha256:bf16bdcff9c96b76a6d417bd8f0a3abe0e55c0ed9bdb3549e906834e2592fd5f`
+
 const ubuntuConfig = `{
     "architecture": "amd64",
     "config": {
@@ -438,7 +440,7 @@ func validImage() *imageapi.Image {
 			},
 		},
 		DockerImageMetadata: imageapi.DockerImage{
-			ID:            "sha256:bf16bdcff9c96b76a6d417bd8f0a3abe0e55c0ed9bdb3549e906834e2592fd5f",
+			ID:            ubuntuConfigDigest,
 			Parent:        "",
 			Comment:       "",
 			Created:       metav1.Date(2025, 5, 29, 4, 21, 1, 971275965, time.UTC),
