@@ -166,7 +166,7 @@ func TestCreateSetsMetadata(t *testing.T) {
 				}
 				return ok
 			},
-			image: etcImage(),
+			image: etcdImage(),
 		},
 	}
 
@@ -207,45 +207,34 @@ func TestUpdateResetsMetadata(t *testing.T) {
 		{
 			name: "manifest changes are ignored",
 			expect: func(image *imageapi.Image) bool {
+				ok := true
 				if image.Labels["a"] != "b" {
 					t.Errorf("unexpected labels: %s", image.Labels)
-					return false
+					ok = false
 				}
-				if image.DockerImageManifest != "" {
-					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
-					return false
-				}
-				if image.DockerImageMetadata.ID != "foo" {
+				if image.DockerImageMetadata.ID != etcdConfigDigest {
 					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
-					return false
+					ok = false
 				}
-				if image.DockerImageReference == "openshift/ruby-19-centos-2" {
+				if image.DockerImageReference != "bitnami/etcd-updated" {
 					t.Errorf("image reference not changed: %s", image.DockerImageReference)
-					return false
+					ok = false
 				}
-				if image.DockerImageMetadata.Size != 0 {
+				if image.DockerImageMetadata.Size != 67218142 {
 					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
+					ok = false
 				}
-				if len(image.DockerImageLayers) != 1 && image.DockerImageLayers[0].LayerSize != 10 {
+				if len(image.DockerImageLayers) != 1 || image.DockerImageLayers[0].LayerSize != 67215871 {
 					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
+					ok = false
 				}
-				return true
+				return ok
 			},
-			existing: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos-2",
-				DockerImageLayers:    []imageapi.ImageLayer{{Name: "test", LayerSize: 10}},
-				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
-			},
-			image: &imageapi.Image{
-				ObjectMeta:                   metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Labels: map[string]string{"a": "b"}},
-				DockerImageReference:         "openshift/ruby-19-centos",
-				DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
-				DockerImageManifest:          etcdManifest,
-				DockerImageConfig:            etcdConfig,
-			},
+			existing: etcdImage(),
+			image: etcdImage(func(img *imageapi.Image) {
+				img.Labels = map[string]string{"a": "b"}
+				img.DockerImageReference = "bitnami/etcd-updated"
+			}),
 		},
 		{
 			name: "manifest is preserved and unpacked",
@@ -366,15 +355,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 	}
 }
 
-func validImage() *imageapi.Image {
-	return &imageapi.Image{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:         "foo",
-			GenerateName: "foo",
-		},
-		DockerImageReference:         "openshift/origin",
-		DockerImageManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
-		DockerImageManifest: `{
+const ubuntuManifest = `{
     "schemaVersion": 2,
     "mediaType": "application/vnd.oci.image.manifest.v1+json",
     "config": {
@@ -389,8 +370,9 @@ func validImage() *imageapi.Image {
             "digest": "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a"
         }
     ]
-}`,
-		DockerImageConfig: `{
+}`
+
+const ubuntuConfig = `{
     "architecture": "amd64",
     "config": {
         "Hostname": "",
@@ -488,8 +470,18 @@ func validImage() *imageapi.Image {
             "sha256:a8346d259389bc6221b4f3c61bad4e48087c5b82308e8f53ce703cfc8333c7b3"
         ]
     }
-}`,
+}`
 
+func validImage() *imageapi.Image {
+	return &imageapi.Image{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:         "foo",
+			GenerateName: "foo",
+		},
+		DockerImageReference:         "openshift/origin",
+		DockerImageManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+		DockerImageManifest:          ubuntuManifest,
+		DockerImageConfig:            ubuntuConfig,
 		DockerImageLayers: []imageapi.ImageLayer{
 			{
 				Name:      "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a",
@@ -570,6 +562,8 @@ func validImage() *imageapi.Image {
 	}
 }
 
+const etcdManifestDigest = `sha256:c5f810e973f9d0985c4075650cbfaf6c2fb31d6508fdb2e5ed03dc58c5f5d2a6`
+
 const etcdManifest = `{
     "schemaVersion": 2,
     "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
@@ -586,6 +580,8 @@ const etcdManifest = `{
         }
     ]
 }`
+
+const etcdConfigDigest = `sha256:f21cd1b754d0525496ccae928c01718a5cc7596f5b19ddd8c8f522aee91adff2`
 
 const etcdConfig = `{
     "architecture": "amd64",
@@ -651,9 +647,93 @@ const etcdConfig = `{
     }
 }`
 
-var etcImageTemplate = imageapi.Image{
+const etcdManifestDigest_3_6_0 = `sha256:db096f7d7de69acc085ad8fe410afe90dbb609e0eaa03173b07c9e5e1d308364`
+
+const etcdManifest_3_6_0 = `{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+    "config": {
+        "mediaType": "application/vnd.docker.container.image.v1+json",
+        "size": 7477,
+        "digest": "sha256:d9cd21f84106ff875849222e5a6a031f41e5963209d06edab745f1053142e0f3"
+    },
+    "layers": [
+        {
+            "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+            "size": 67226461,
+            "digest": "sha256:9246570107a64678d56e2ba329b85fea7107177f0c36948a9dc1578d20941c7d"
+        }
+    ]
+}
+`
+
+const etcdConfig_3_6_0 = `{
+    "architecture": "amd64",
+    "created": "2025-06-05T22:07:21.085176301Z",
+    "history": [
+        {
+            "created": "0001-01-01T00:00:00Z",
+            "created_by": "crane flatten sha256:bcccd6b0bfe74be98862b3e04822019b9b33638ea0d5554f0fca2aa39461351b"
+        }
+    ],
+    "os": "linux",
+    "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+            "sha256:a6c9dfd8fbd0dfebacae8aa0a675ae3a551ced0cb7e8fbcb6edf9e5879fbef8a"
+        ]
+    },
+    "config": {
+        "Cmd": [
+            "/opt/bitnami/scripts/etcd/run.sh"
+        ],
+        "Entrypoint": [
+            "/opt/bitnami/scripts/etcd/entrypoint.sh"
+        ],
+        "Env": [
+            "PATH=/opt/bitnami/common/bin:/opt/bitnami/etcd/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "HOME=/",
+            "OS_ARCH=amd64",
+            "OS_FLAVOUR=debian-12",
+            "OS_NAME=linux",
+            "APP_VERSION=3.6.0",
+            "BITNAMI_APP_NAME=etcd"
+        ],
+        "Labels": {
+            "com.vmware.cp.artifact.flavor": "sha256:c50c90cfd9d12b445b011e6ad529f1ad3daea45c26d20b00732fae3cd71f6a83",
+            "org.opencontainers.image.base.name": "docker.io/bitnami/minideb:bookworm",
+            "org.opencontainers.image.created": "2025-06-05T22:01:46Z",
+            "org.opencontainers.image.description": "Application packaged by Broadcom, Inc.",
+            "org.opencontainers.image.documentation": "https://github.com/bitnami/containers/tree/main/bitnami/etcd/README.md",
+            "org.opencontainers.image.ref.name": "3.6.0-debian-12-r3",
+            "org.opencontainers.image.source": "https://github.com/bitnami/containers/tree/main/bitnami/etcd",
+            "org.opencontainers.image.title": "etcd",
+            "org.opencontainers.image.vendor": "Broadcom, Inc.",
+            "org.opencontainers.image.version": "3.6.0"
+        },
+        "User": "1001",
+        "WorkingDir": "/opt/bitnami/etcd",
+        "ExposedPorts": {
+            "2379/tcp": {},
+            "2380/tcp": {}
+        },
+        "ArgsEscaped": true,
+        "Shell": [
+            "/bin/bash",
+            "-o",
+            "errexit",
+            "-o",
+            "nounset",
+            "-o",
+            "pipefail",
+            "-c"
+        ]
+    }
+}`
+
+var etcdImageTemplate = imageapi.Image{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:         "etcd",
+		Name:         etcdManifestDigest,
 		GenerateName: "etcd",
 	},
 	DockerImageReference:         "bitnami/etcd",
@@ -662,8 +742,11 @@ var etcImageTemplate = imageapi.Image{
 	DockerImageConfig:            etcdConfig,
 }
 
-func etcImage() *imageapi.Image {
-	img := etcImageTemplate.DeepCopy()
+func etcdImage(hooks ...func(*imageapi.Image)) *imageapi.Image {
+	img := etcdImageTemplate.DeepCopy()
+	for _, h := range hooks {
+		h(img)
+	}
 	if err := imageutil.InternalImageWithMetadata(img); err != nil {
 		panic(err)
 	}
