@@ -199,12 +199,13 @@ func TestCreateSetsMetadata(t *testing.T) {
 
 func TestUpdateResetsMetadata(t *testing.T) {
 	testCases := []struct {
+		name     string
 		image    *imageapi.Image
 		existing *imageapi.Image
 		expect   func(*imageapi.Image) bool
 	}{
-		// manifest changes are ignored
 		{
+			name: "manifest changes are ignored",
 			expect: func(image *imageapi.Image) bool {
 				if image.Labels["a"] != "b" {
 					t.Errorf("unexpected labels: %s", image.Labels)
@@ -246,8 +247,8 @@ func TestUpdateResetsMetadata(t *testing.T) {
 				DockerImageConfig:            etcdConfig,
 			},
 		},
-		// existing manifest is preserved, and unpacked
 		{
+			name: "manifest is preserved and unpacked",
 			expect: func(image *imageapi.Image) bool {
 				if len(image.DockerImageManifest) != 0 {
 					t.Errorf("unexpected not empty manifest")
@@ -285,8 +286,8 @@ func TestUpdateResetsMetadata(t *testing.T) {
 				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
 			},
 		},
-		// old manifest is replaced because the new manifest matches the digest
 		{
+			name: "manifest is replaced - new manifest matches the digest",
 			expect: func(image *imageapi.Image) bool {
 				if image.DockerImageManifest != etcdManifest {
 					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
@@ -329,37 +330,39 @@ func TestUpdateResetsMetadata(t *testing.T) {
 		}}
 
 	for i, test := range testCases {
-		storage, server := newStorage(t)
-		defer server.Terminate(t)
-		defer storage.Store.DestroyFunc()
+		t.Run(test.name, func(t *testing.T) {
+			storage, server := newStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
 
-		// Clear the resource version before creating
-		test.existing.ResourceVersion = ""
-		created, err := storage.Create(apirequest.NewDefaultContext(), test.existing, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-		if err != nil {
-			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
-			continue
-		}
+			// Clear the resource version before creating
+			test.existing.ResourceVersion = ""
+			created, err := storage.Create(apirequest.NewDefaultContext(), test.existing, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if err != nil {
+				t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
+				return
+			}
 
-		// Copy the resource version into our update object
-		test.image.ResourceVersion = created.(*imageapi.Image).ResourceVersion
-		obj, _, err := storage.Update(apirequest.NewDefaultContext(), test.image.Name, rest.DefaultUpdatedObjectInfo(test.image), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
-		if err != nil {
-			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
-			continue
-		}
-		if obj == nil {
-			t.Errorf("%d: Expected nil obj, got %v", i, obj)
-			continue
-		}
-		image, ok := obj.(*imageapi.Image)
-		if !ok {
-			t.Errorf("%d: Expected image type, got: %#v", i, obj)
-			continue
-		}
-		if test.expect != nil && !test.expect(image) {
-			t.Errorf("%d: Unexpected image: %#v", i, obj)
-		}
+			// Copy the resource version into our update object
+			test.image.ResourceVersion = created.(*imageapi.Image).ResourceVersion
+			obj, _, err := storage.Update(apirequest.NewDefaultContext(), test.image.Name, rest.DefaultUpdatedObjectInfo(test.image), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if err != nil {
+				t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
+				return
+			}
+			if obj == nil {
+				t.Errorf("%d: Expected nil obj, got %v", i, obj)
+				return
+			}
+			image, ok := obj.(*imageapi.Image)
+			if !ok {
+				t.Errorf("%d: Expected image type, got: %#v", i, obj)
+				return
+			}
+			if test.expect != nil && !test.expect(image) {
+				t.Errorf("%d: Unexpected image: %#v", i, obj)
+			}
+		})
 	}
 }
 
