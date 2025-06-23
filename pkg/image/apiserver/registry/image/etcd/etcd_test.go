@@ -206,7 +206,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
 					ok = false
 				}
-				if image.DockerImageReference != "bitnami/etcd-updated" {
+				if image.DockerImageReference != "kindest/node-updated" {
 					t.Errorf("image reference not changed: %s", image.DockerImageReference)
 					ok = false
 				}
@@ -223,7 +223,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 			existing: testutil.MustKindestImage(),
 			image: testutil.MustKindestImage(func(img *imageapi.Image) {
 				img.Labels = map[string]string{"a": "b"}
-				img.DockerImageReference = "bitnami/etcd-updated"
+				img.DockerImageReference = "kindest/node-updated"
 			}),
 		},
 		{
@@ -237,7 +237,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
 					return false
 				}
-				if image.DockerImageReference != "bitnami/etcd-updated" {
+				if image.DockerImageReference != "kindest/node-updated" {
 					t.Errorf("image reference not changed: %s", image.DockerImageReference)
 					return false
 				}
@@ -257,7 +257,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 					Name:         testutil.KindestConfigDigest,
 					GenerateName: "etcd",
 				},
-				DockerImageReference: "bitnami/etcd-updated",
+				DockerImageReference: "kindest/node-updated",
 			},
 		},
 	}
