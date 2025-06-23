@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/internal/imageutil"
 	"testing"
 	"time"
 
@@ -139,59 +140,60 @@ func TestWatch(t *testing.T) {
 
 func TestCreateSetsMetadata(t *testing.T) {
 	testCases := []struct {
+		name   string
 		image  *imageapi.Image
 		expect func(*imageapi.Image) bool
 	}{
+		// XXX
 		{
+			name: "bare image",
 			image: &imageapi.Image{
 				ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
 				DockerImageReference: "openshift/ruby-19-centos",
 			},
 		},
 		{
+			name: "image with docker",
 			expect: func(image *imageapi.Image) bool {
-				if image.DockerImageMetadata.Size != 28643712 {
+				ok := true
+				if image.DockerImageMetadata.Size != 67218142 {
 					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
+					ok = false
 				}
-				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
+				if len(image.DockerImageLayers) != 1 || image.DockerImageLayers[0].Name != "sha256:a425929bf30ed86191ff0d58db6907a92e41de14e58465658e2c165b391cd49d" || image.DockerImageLayers[0].LayerSize != 67215871 {
 					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
+					ok = false
 				}
-				return true
+				return ok
 			},
-			image: &imageapi.Image{
-				ObjectMeta:                   metav1.ObjectMeta{Name: "foo"},
-				DockerImageReference:         "openshift/ruby-19-centos",
-				DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
-				DockerImageManifest:          etcdManifest,
-				DockerImageConfig:            etcdConfig,
-			},
+			image: etcImage(),
 		},
 	}
 
 	for i, test := range testCases {
-		storage, server := newStorage(t)
-		defer server.Terminate(t)
-		defer storage.Store.DestroyFunc()
+		t.Run(test.name, func(t *testing.T) {
+			storage, server := newStorage(t)
+			defer server.Terminate(t)
+			defer storage.Store.DestroyFunc()
 
-		obj, err := storage.Create(apirequest.NewDefaultContext(), test.image, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
-		if obj == nil {
-			t.Errorf("%d: Expected nil obj, got %v", i, obj)
-			continue
-		}
-		if err != nil {
-			t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
-			continue
-		}
-		image, ok := obj.(*imageapi.Image)
-		if !ok {
-			t.Errorf("%d: Expected image type, got: %#v", i, obj)
-			continue
-		}
-		if test.expect != nil && !test.expect(image) {
-			t.Errorf("%d: Unexpected image: %#v", i, obj)
-		}
+			obj, err := storage.Create(apirequest.NewDefaultContext(), test.image, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+			if obj == nil {
+				t.Errorf("%d: Expected nil obj, got %v", i, obj)
+				return
+			}
+			if err != nil {
+				t.Errorf("%d: Unexpected non-nil error: %#v", i, err)
+				return
+			}
+			image, ok := obj.(*imageapi.Image)
+			if !ok {
+				t.Errorf("%d: Expected image type, got: %#v", i, obj)
+				return
+			}
+			if test.expect != nil && !test.expect(image) {
+				t.Errorf("%d: Unexpected image: %#v", i, obj)
+			}
+		})
 	}
 }
 
@@ -588,7 +590,7 @@ const etcdConfig = `{
     "history": [
         {
             "created": "0001-01-01T00:00:00Z",
-            "created_by": "crane flatten sha256:9795186cd4d9720cb833e3ee623fafa358060e7567fbb9480cb43d75dbac6f8b",
+            "created_by": "crane flatten sha256:9795186cd4d9720cb833e3ee623fafa358060e7567fbb9480cb43d75dbac6f8b"
         }
     ],
     "os": "linux",
@@ -645,3 +647,22 @@ const etcdConfig = `{
         ]
     }
 }`
+
+var etcImageTemplate = imageapi.Image{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:         "etcd",
+		GenerateName: "etcd",
+	},
+	DockerImageReference:         "bitnami/etcd",
+	DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
+	DockerImageManifest:          etcdManifest,
+	DockerImageConfig:            etcdConfig,
+}
+
+func etcImage() *imageapi.Image {
+	img := etcImageTemplate.DeepCopy()
+	if err := imageutil.InternalImageWithMetadata(img); err != nil {
+		panic(err)
+	}
+	return img
+}
