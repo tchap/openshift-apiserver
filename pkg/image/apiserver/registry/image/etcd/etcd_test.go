@@ -243,36 +243,31 @@ func TestUpdateResetsMetadata(t *testing.T) {
 					t.Errorf("unexpected not empty manifest")
 					return false
 				}
-				if image.DockerImageMetadata.ID != "fe50ac14986497fa6b5d2cc24feb4a561d01767bc64413752c0988cb70b0b8b9" {
+				if image.DockerImageMetadata.ID != etcdConfigDigest {
 					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
 					return false
 				}
-				if image.DockerImageReference != "openshift/ruby-19-centos" {
+				if image.DockerImageReference != "bitnami/etcd-updated" {
 					t.Errorf("image reference not changed: %s", image.DockerImageReference)
 					return false
 				}
-				if image.DockerImageMetadata.Size != 28643712 {
+				if image.DockerImageMetadata.Size != 67218142 {
 					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
 					return false
 				}
-				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
+				if len(image.DockerImageLayers) != 1 || image.DockerImageLayers[0].Name != "sha256:a425929bf30ed86191ff0d58db6907a92e41de14e58465658e2c165b391cd49d" || image.DockerImageLayers[0].LayerSize != 67215871 {
 					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
 					return false
 				}
 				return true
 			},
-			existing: &imageapi.Image{
-				ObjectMeta:                   metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-				DockerImageReference:         "openshift/ruby-19-centos-2",
-				DockerImageLayers:            []imageapi.ImageLayer{},
-				DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
-				DockerImageManifest:          etcdManifest,
-				DockerImageConfig:            etcdConfig,
-			},
+			existing: etcdImage(),
 			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-				DockerImageReference: "openshift/ruby-19-centos",
-				DockerImageMetadata:  imageapi.DockerImage{ID: "foo"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:         etcdManifestDigest,
+					GenerateName: "etcd",
+				},
+				DockerImageReference: "bitnami/etcd-updated",
 			},
 		},
 		{
