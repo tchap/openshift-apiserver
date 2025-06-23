@@ -2,8 +2,8 @@ package testutil
 
 import (
 	imageapi "github.com/openshift/openshift-apiserver/pkg/image/apis/image"
+	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/internal/imageutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 // kindest/node:v1.33.1
@@ -134,7 +134,7 @@ const kindestConfig = `{
     }
 }`
 
-func ImageSchemaV2(hooks ...func(*imageapi.Image)) *imageapi.Image {
+func MustImageSchemaV2(hooks ...func(*imageapi.Image)) *imageapi.Image {
 	img := &imageapi.Image{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         kindestImageDigest,
@@ -144,86 +144,12 @@ func ImageSchemaV2(hooks ...func(*imageapi.Image)) *imageapi.Image {
 		DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
 		DockerImageManifest:          kindestManifest,
 		DockerImageConfig:            kindestConfig,
-		DockerImageLayers: []imageapi.ImageLayer{
-			{
-				Name:      "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a",
-				LayerSize: 29715337,
-				MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
-			},
-		},
-		DockerImageMetadata: imageapi.DockerImage{
-			ID:            kindestImageDigest,
-			Parent:        "",
-			Comment:       "",
-			Created:       metav1.Date(2025, 5, 29, 4, 21, 1, 971275965, time.UTC),
-			Container:     "57d2303e19c80641e487894fdb01e8e26ab42726f45e72624efe9d812e1c8889",
-			DockerVersion: "24.0.7",
-			Author:        "",
-			Architecture:  "amd64",
-			Size:          29718508,
-			ContainerConfig: imageapi.DockerConfig{
-				Hostname:        "57d2303e19c8",
-				Domainname:      "",
-				User:            "",
-				Memory:          0,
-				MemorySwap:      0,
-				CPUShares:       0,
-				CPUSet:          "",
-				AttachStdin:     false,
-				AttachStdout:    false,
-				AttachStderr:    false,
-				PortSpecs:       nil,
-				ExposedPorts:    nil,
-				Tty:             false,
-				OpenStdin:       false,
-				StdinOnce:       false,
-				Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
-				Cmd:             []string{"/bin/sh", "-c", "#(nop) ", `CMD ["/bin/bash"]`},
-				Image:           "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
-				Volumes:         nil,
-				WorkingDir:      "",
-				Entrypoint:      nil,
-				NetworkDisabled: false,
-				SecurityOpts:    nil,
-				OnBuild:         nil,
-				Labels: map[string]string{
-					"org.opencontainers.image.ref.name": "ubuntu",
-					"org.opencontainers.image.version":  "24.04",
-				},
-			},
-			Config: &imageapi.DockerConfig{
-				Hostname:        "",
-				Domainname:      "",
-				User:            "",
-				Memory:          0,
-				MemorySwap:      0,
-				CPUShares:       0,
-				CPUSet:          "",
-				AttachStdin:     false,
-				AttachStdout:    false,
-				AttachStderr:    false,
-				PortSpecs:       nil,
-				ExposedPorts:    nil,
-				Tty:             false,
-				OpenStdin:       false,
-				StdinOnce:       false,
-				Env:             []string{"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"},
-				Cmd:             []string{"/bin/bash"},
-				Image:           "sha256:825befda5d2b1a76b71f4e1d6d31f5d82d4488b8337b1ad42e29b1340d766647",
-				Volumes:         nil,
-				WorkingDir:      "",
-				Entrypoint:      nil,
-				NetworkDisabled: false,
-				OnBuild:         nil,
-				Labels: map[string]string{
-					"org.opencontainers.image.ref.name": "ubuntu",
-					"org.opencontainers.image.version":  "24.04",
-				},
-			},
-		},
 	}
 	for _, hook := range hooks {
 		hook(img)
+	}
+	if err := imageutil.InternalImageWithMetadata(img); err != nil {
+		panic(err)
 	}
 	return img
 }
