@@ -1,7 +1,8 @@
 package etcd
 
 import (
-	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/internal/testutil"
+	"testing"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -14,9 +15,9 @@ import (
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"testing"
 
 	imageapi "github.com/openshift/openshift-apiserver/pkg/image/apis/image"
+	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/internal/testutil"
 	"github.com/openshift/openshift-apiserver/pkg/image/apiserver/registry/image"
 
 	// install all APIs

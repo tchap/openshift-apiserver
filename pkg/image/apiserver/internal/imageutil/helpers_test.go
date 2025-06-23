@@ -8,10 +8,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	imagev1 "github.com/openshift/api/image/v1"
-	imageapi "github.com/openshift/openshift-apiserver/pkg/image/apis/image"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreapi "k8s.io/kubernetes/pkg/apis/core"
+
+	imagev1 "github.com/openshift/api/image/v1"
+	imageapi "github.com/openshift/openshift-apiserver/pkg/image/apis/image"
 )
 
 func TestImageWithMetadata(t *testing.T) {
