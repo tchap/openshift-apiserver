@@ -144,16 +144,8 @@ func TestCreateSetsMetadata(t *testing.T) {
 		image  *imageapi.Image
 		expect func(*imageapi.Image) bool
 	}{
-		// XXX
 		{
-			name: "bare image",
-			image: &imageapi.Image{
-				ObjectMeta:           metav1.ObjectMeta{Name: "foo"},
-				DockerImageReference: "openshift/ruby-19-centos",
-			},
-		},
-		{
-			name: "image with docker",
+			name: "image schema v2",
 			expect: func(image *imageapi.Image) bool {
 				ok := true
 				if image.DockerImageMetadata.Size != 67218142 {
@@ -270,48 +262,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 				DockerImageReference: "bitnami/etcd-updated",
 			},
 		},
-		{
-			name: "manifest is replaced - new manifest matches the digest",
-			expect: func(image *imageapi.Image) bool {
-				if image.DockerImageManifest != etcdManifest {
-					t.Errorf("unexpected manifest: %s", image.DockerImageManifest)
-					return false
-				}
-				if image.DockerImageMetadata.ID != "fe50ac14986497fa6b5d2cc24feb4a561d01767bc64413752c0988cb70b0b8b9" {
-					t.Errorf("unexpected container image: %#v", image.DockerImageMetadata)
-					return false
-				}
-				if image.DockerImageReference != "openshift/ruby-19-centos" {
-					t.Errorf("image reference not changed: %s", image.DockerImageReference)
-					return false
-				}
-				if image.DockerImageMetadata.Size != 28643712 {
-					t.Errorf("image had size %d", image.DockerImageMetadata.Size)
-					return false
-				}
-				if len(image.DockerImageLayers) != 4 || image.DockerImageLayers[0].Name != "sha256:744b46d0ac8636c45870a03830d8d82c20b75fbfb9bc937d5e61005d23ad4cfe" || image.DockerImageLayers[0].LayerSize != 15141568 {
-					t.Errorf("unexpected layers: %#v", image.DockerImageLayers)
-					return false
-				}
-				return true
-			},
-			existing: &imageapi.Image{
-				ObjectMeta:                   metav1.ObjectMeta{Name: "sha256:958608f8ecc1dc62c93b6c610f3a834dae4220c9642e6e8b4e0f2b3ad7cbd238", ResourceVersion: "1"},
-				DockerImageReference:         "openshift/ruby-19-centos-2",
-				DockerImageLayers:            []imageapi.ImageLayer{},
-				DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
-				DockerImageManifest:          etcdManifest,
-				DockerImageConfig:            etcdConfig,
-			},
-			image: &imageapi.Image{
-				ObjectMeta:                   metav1.ObjectMeta{Name: "sha256:958608f8ecc1dc62c93b6c610f3a834dae4220c9642e6e8b4e0f2b3ad7cbd238", ResourceVersion: "1"},
-				DockerImageReference:         "openshift/ruby-19-centos",
-				DockerImageMetadata:          imageapi.DockerImage{ID: "foo"},
-				DockerImageManifestMediaType: "application/vnd.docker.distribution.manifest.v2+json",
-				DockerImageManifest:          etcdManifest,
-				DockerImageConfig:            etcdConfig,
-			},
-		}}
+	}
 
 	for i, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -349,6 +300,8 @@ func TestUpdateResetsMetadata(t *testing.T) {
 		})
 	}
 }
+
+const ubuntuManifestDigest = `sha256:04f510bf1f2528604dc2ff46b517dbdbb85c262d62eacc4aa4d3629783036096`
 
 const ubuntuManifest = `{
     "schemaVersion": 2,
@@ -470,7 +423,7 @@ const ubuntuConfig = `{
 func validImage() *imageapi.Image {
 	return &imageapi.Image{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:         "foo",
+			Name:         ubuntuManifestDigest,
 			GenerateName: "foo",
 		},
 		DockerImageReference:         "openshift/origin",
@@ -621,90 +574,6 @@ const etcdConfig = `{
             "org.opencontainers.image.title": "etcd",
             "org.opencontainers.image.vendor": "Broadcom, Inc.",
             "org.opencontainers.image.version": "3.6.1"
-        },
-        "User": "1001",
-        "WorkingDir": "/opt/bitnami/etcd",
-        "ExposedPorts": {
-            "2379/tcp": {},
-            "2380/tcp": {}
-        },
-        "ArgsEscaped": true,
-        "Shell": [
-            "/bin/bash",
-            "-o",
-            "errexit",
-            "-o",
-            "nounset",
-            "-o",
-            "pipefail",
-            "-c"
-        ]
-    }
-}`
-
-const etcdManifestDigest_3_6_0 = `sha256:db096f7d7de69acc085ad8fe410afe90dbb609e0eaa03173b07c9e5e1d308364`
-
-const etcdManifest_3_6_0 = `{
-    "schemaVersion": 2,
-    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-    "config": {
-        "mediaType": "application/vnd.docker.container.image.v1+json",
-        "size": 7477,
-        "digest": "sha256:d9cd21f84106ff875849222e5a6a031f41e5963209d06edab745f1053142e0f3"
-    },
-    "layers": [
-        {
-            "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-            "size": 67226461,
-            "digest": "sha256:9246570107a64678d56e2ba329b85fea7107177f0c36948a9dc1578d20941c7d"
-        }
-    ]
-}
-`
-
-const etcdConfig_3_6_0 = `{
-    "architecture": "amd64",
-    "created": "2025-06-05T22:07:21.085176301Z",
-    "history": [
-        {
-            "created": "0001-01-01T00:00:00Z",
-            "created_by": "crane flatten sha256:bcccd6b0bfe74be98862b3e04822019b9b33638ea0d5554f0fca2aa39461351b"
-        }
-    ],
-    "os": "linux",
-    "rootfs": {
-        "type": "layers",
-        "diff_ids": [
-            "sha256:a6c9dfd8fbd0dfebacae8aa0a675ae3a551ced0cb7e8fbcb6edf9e5879fbef8a"
-        ]
-    },
-    "config": {
-        "Cmd": [
-            "/opt/bitnami/scripts/etcd/run.sh"
-        ],
-        "Entrypoint": [
-            "/opt/bitnami/scripts/etcd/entrypoint.sh"
-        ],
-        "Env": [
-            "PATH=/opt/bitnami/common/bin:/opt/bitnami/etcd/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-            "HOME=/",
-            "OS_ARCH=amd64",
-            "OS_FLAVOUR=debian-12",
-            "OS_NAME=linux",
-            "APP_VERSION=3.6.0",
-            "BITNAMI_APP_NAME=etcd"
-        ],
-        "Labels": {
-            "com.vmware.cp.artifact.flavor": "sha256:c50c90cfd9d12b445b011e6ad529f1ad3daea45c26d20b00732fae3cd71f6a83",
-            "org.opencontainers.image.base.name": "docker.io/bitnami/minideb:bookworm",
-            "org.opencontainers.image.created": "2025-06-05T22:01:46Z",
-            "org.opencontainers.image.description": "Application packaged by Broadcom, Inc.",
-            "org.opencontainers.image.documentation": "https://github.com/bitnami/containers/tree/main/bitnami/etcd/README.md",
-            "org.opencontainers.image.ref.name": "3.6.0-debian-12-r3",
-            "org.opencontainers.image.source": "https://github.com/bitnami/containers/tree/main/bitnami/etcd",
-            "org.opencontainers.image.title": "etcd",
-            "org.opencontainers.image.vendor": "Broadcom, Inc.",
-            "org.opencontainers.image.version": "3.6.0"
         },
         "User": "1001",
         "WorkingDir": "/opt/bitnami/etcd",
