@@ -215,6 +215,100 @@ func TestImageWithMetadata(t *testing.T) {
 				},
 			},
 		},
+		"happy path OCI multiple layers": {
+			image: validImageWithManifestOCIDataMultipleLayers(),
+			expectedImage: imageapi.Image{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "sha256:99a93c48631257c32751cc64aaa73adc2bcc1e95ef5011d975f71a04b970646b",
+					Annotations: map[string]string{
+						imagev1.DockerImageLayersOrderAnnotation: imagev1.DockerImageLayersOrderAscending,
+					},
+				},
+				DockerImageConfig:            validImageWithManifestOCIDataMultipleLayers().DockerImageConfig,
+				DockerImageManifest:          validImageWithManifestOCIDataMultipleLayers().DockerImageManifest,
+				DockerImageManifestMediaType: "application/vnd.oci.image.manifest.v1+json",
+				DockerImageLayers: []imageapi.ImageLayer{
+					{
+						Name:      "sha256:0c01110621e0ec1eded421406c9f117f7ae5486c8f7b0a0d1a37cc7bc9317226",
+						LayerSize: 48494272,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+					{
+						Name:      "sha256:3b1eb73e993990490aa137c00e60ff4ca9d1715bafb8e888dbb0986275edb13f",
+						LayerSize: 24015708,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+					{
+						Name:      "sha256:b1b8a0660a31403a35d70b276c3c86b1200b8683e83cd77a92ec98744017684a",
+						LayerSize: 64399794,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+					{
+						Name:      "sha256:420c602e8633734081b143b180e927a7c4b2993e514b8b19d91b935983d0dc88",
+						LayerSize: 92355229,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+					{
+						Name:      "sha256:a8f67fead7e33763b5fa924cb2e4644bbf5332ed056eb32ba0bcd3bdb68eea3b",
+						LayerSize: 78981811,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+					{
+						Name:      "sha256:1f64d3b080beb286622037cab1eea6b66361f7824c5935c00e96deac1a3dadbc",
+						LayerSize: 125,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+					{
+						Name:      "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+						LayerSize: 32,
+						MediaType: "application/vnd.oci.image.layer.v1.tar+gzip",
+					},
+				},
+				DockerImageMetadata: imageapi.DockerImage{
+					ID:              "sha256:99a93c48631257c32751cc64aaa73adc2bcc1e95ef5011d975f71a04b970646b",
+					Parent:          "",
+					Comment:         "",
+					Created:         metav1.Date(2025, 6, 5, 18, 53, 13, 0, time.UTC),
+					Container:       "",
+					DockerVersion:   "",
+					Author:          "",
+					Architecture:    "amd64",
+					Size:            308250765,
+					ContainerConfig: imageapi.DockerConfig{},
+					Config: &imageapi.DockerConfig{
+						Hostname:     "",
+						Domainname:   "",
+						User:         "",
+						Memory:       0,
+						MemorySwap:   0,
+						CPUShares:    0,
+						CPUSet:       "",
+						AttachStdin:  false,
+						AttachStdout: false,
+						AttachStderr: false,
+						PortSpecs:    nil,
+						ExposedPorts: nil,
+						Tty:          false,
+						OpenStdin:    false,
+						StdinOnce:    false,
+						Env: []string{
+							"PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+							"GOLANG_VERSION=1.24.4",
+							"GOTOOLCHAIN=local",
+							"GOPATH=/go",
+						},
+						Cmd:             []string{"bash"},
+						Image:           "",
+						Volumes:         nil,
+						WorkingDir:      "/go",
+						Entrypoint:      nil,
+						NetworkDisabled: false,
+						OnBuild:         nil,
+						Labels:          nil,
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -508,6 +602,160 @@ func validImageWithManifestOCIData() imageapi.Image {
             "digest": "sha256:d9d352c11bbd3880007953ed6eec1cbace76898828f3434984a0ca60672fdf5a"
         }
     ]
+}`,
+	}
+}
+
+func validImageWithManifestOCIDataMultipleLayers() imageapi.Image {
+	return imageapi.Image{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "sha256:99a93c48631257c32751cc64aaa73adc2bcc1e95ef5011d975f71a04b970646b",
+		},
+		DockerImageConfig: `{
+    "architecture": "amd64",
+    "config": {
+        "Env": [
+            "PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "GOLANG_VERSION=1.24.4",
+            "GOTOOLCHAIN=local",
+            "GOPATH=/go"
+        ],
+        "Cmd": [
+            "bash"
+        ],
+        "WorkingDir": "/go"
+    },
+    "created": "2025-06-05T18:53:13Z",
+    "history": [
+        {
+            "created": "2023-05-10T23:29:59Z",
+            "created_by": "# debian.sh --arch 'amd64' out/ 'bookworm' '@1749513600'",
+            "comment": "debuerreotype 0.15"
+        },
+        {
+            "created": "2023-05-10T23:29:59Z",
+            "created_by": "RUN /bin/sh -c set -eux; \tapt-get update; \tapt-get install -y --no-install-recommends \t\tca-certificates \t\tcurl \t\tgnupg \t\tnetbase \t\tsq \t\twget \t; \trm -rf /var/lib/apt/lists/* # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2024-01-09T01:14:25Z",
+            "created_by": "RUN /bin/sh -c set -eux; \tapt-get update; \tapt-get install -y --no-install-recommends \t\tgit \t\tmercurial \t\topenssh-client \t\tsubversion \t\t\t\tprocps \t; \trm -rf /var/lib/apt/lists/* # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "RUN /bin/sh -c set -eux; \tapt-get update; \tapt-get install -y --no-install-recommends \t\tg++ \t\tgcc \t\tlibc6-dev \t\tmake \t\tpkg-config \t; \trm -rf /var/lib/apt/lists/* # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "ENV GOLANG_VERSION=1.24.4",
+            "comment": "buildkit.dockerfile.v0",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "ENV GOTOOLCHAIN=local",
+            "comment": "buildkit.dockerfile.v0",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "ENV GOPATH=/go",
+            "comment": "buildkit.dockerfile.v0",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "comment": "buildkit.dockerfile.v0",
+            "empty_layer": true
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "COPY /target/ / # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "RUN /bin/sh -c mkdir -p \"$GOPATH/src\" \"$GOPATH/bin\" && chmod -R 1777 \"$GOPATH\" # buildkit",
+            "comment": "buildkit.dockerfile.v0"
+        },
+        {
+            "created": "2025-06-05T18:53:13Z",
+            "created_by": "WORKDIR /go",
+            "comment": "buildkit.dockerfile.v0"
+        }
+    ],
+    "os": "linux",
+    "rootfs": {
+        "type": "layers",
+        "diff_ids": [
+            "sha256:8f003894a7efc4178494f1e133497ed2f325ae53b6a65869e54c04d1c51d588f",
+            "sha256:f5b8fb1def00d5f185660b75bac1eed1fce467d44cebd868dae2f344711321ef",
+            "sha256:1c49688bd8ebe54298be2b61f7d5efd32467862f115b5439b87c19e56e57c6b4",
+            "sha256:c291adf4681b803d1a3fdd12233811fb566c89cf1d423bd62f853d35aeb2c32f",
+            "sha256:86d0740ea51f822cea0316cc9b0aaf705545175ab281342f460f0f14e8742502",
+            "sha256:7c5761aef9e0522152cc129c12b38d65073013ae75888975e1b8469556f3af70",
+            "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+        ]
+    }
+}`,
+		DockerImageManifest: `{
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "config": {
+        "mediaType": "application/vnd.oci.image.config.v1+json",
+        "digest": "sha256:99a93c48631257c32751cc64aaa73adc2bcc1e95ef5011d975f71a04b970646b",
+        "size": 2803
+    },
+    "layers": [
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:0c01110621e0ec1eded421406c9f117f7ae5486c8f7b0a0d1a37cc7bc9317226",
+            "size": 48494272
+        },
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:3b1eb73e993990490aa137c00e60ff4ca9d1715bafb8e888dbb0986275edb13f",
+            "size": 24015708
+        },
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:b1b8a0660a31403a35d70b276c3c86b1200b8683e83cd77a92ec98744017684a",
+            "size": 64399794
+        },
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:420c602e8633734081b143b180e927a7c4b2993e514b8b19d91b935983d0dc88",
+            "size": 92355229
+        },
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:a8f67fead7e33763b5fa924cb2e4644bbf5332ed056eb32ba0bcd3bdb68eea3b",
+            "size": 78981811
+        },
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:1f64d3b080beb286622037cab1eea6b66361f7824c5935c00e96deac1a3dadbc",
+            "size": 125
+        },
+        {
+            "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+            "digest": "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+            "size": 32
+        }
+    ],
+    "annotations": {
+        "com.docker.official-images.bashbrew.arch": "amd64",
+        "org.opencontainers.image.base.digest": "sha256:fab1b6389a07a117b06169a1c2bc5a4a3d3f5d7315dea5ebf4d7ad49606d7f32",
+        "org.opencontainers.image.base.name": "buildpack-deps:bookworm-scm",
+        "org.opencontainers.image.created": "2025-06-05T18:53:13Z",
+        "org.opencontainers.image.revision": "205cf586b0d0c7200e0fd642feaf738ddb382da0",
+        "org.opencontainers.image.source": "https://github.com/docker-library/golang.git#205cf586b0d0c7200e0fd642feaf738ddb382da0:1.24/bookworm",
+        "org.opencontainers.image.url": "https://hub.docker.com/_/golang",
+        "org.opencontainers.image.version": "1.24.4-bookworm"
+    }
 }`,
 	}
 }
