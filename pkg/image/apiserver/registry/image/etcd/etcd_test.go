@@ -255,7 +255,7 @@ func TestUpdateResetsMetadata(t *testing.T) {
 			image: &imageapi.Image{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:         testutil.KindestConfigDigest,
-					GenerateName: "etcd",
+					GenerateName: "kindest",
 				},
 				DockerImageReference: "kindest/node-updated",
 			},
