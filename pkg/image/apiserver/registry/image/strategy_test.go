@@ -26,7 +26,7 @@ func fuzzImage(t *testing.T, image *imageapi.Image, seed int64) *imageapi.Image 
 	f.Funcs(
 		func(j *imageapi.Image, c fuzz.Continue) {
 			c.FuzzNoCustom(j)
-			j.Annotations = make(map[string]string)q
+			j.Annotations = make(map[string]string)
 			j.Labels = make(map[string]string)
 			j.Signatures = make([]imageapi.ImageSignature, c.Rand.Intn(3)+2)
 			for i := range j.Signatures {
